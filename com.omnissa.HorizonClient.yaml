@@ -1,0 +1,87 @@
+---
+app-id: com.omnissa.HorizonClient
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: horizon-client
+separate-locales: false
+
+finish-args:
+  # Network access (required to reach Horizon/Connection Server)
+  - --share=network
+  # Display
+  - --socket=x11
+  - --share=ipc
+  - --socket=wayland
+  # Audio (PCoIP RTAV)
+  - --socket=pulseaudio
+  # USB and input devices (smart card, scanner, serial port redirection)
+  - --device=all
+  # Allow access to /dev/fuse (CDR / virtual filesystem redirection)
+  - --device=dri
+  # Persist Horizon client config in ~/.omnissa
+  - --persist=.omnissa
+  # Smart card access
+  - --socket=pcsc
+  # Allow the client to open URLs in the host browser via xdg-open
+  - --talk-name=org.freedesktop.portal.Desktop
+  - --talk-name=org.freedesktop.portal.OpenURI
+  # Wayland/X clipboard
+  - --env=XDG_CURRENT_DESKTOP=GNOME
+  # Needed by the bundled GTK3 libs (libgtkmm-3.0)
+  - --env=LD_LIBRARY_PATH=/app/lib/omnissa:/app/lib/pcoip/vchan_plugins
+  # horizon-client wrapper uses /app paths
+  - --env=VMWARE_BIN=/app/lib/omnissa/horizon/bin
+
+modules:
+  - name: libxml2
+    buildsystem: autotools
+    config-opts:
+      - --without-python
+      - --without-lzma
+      - --without-iconv
+      - --without-zlib
+      - --without-icu
+      - --disable-static
+    sources:
+      - type: archive
+        url: https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.9.tar.xz
+        sha256: a2c9ae7b770da34860050c309f903221c67830c86e4a7e760692b803df95143a
+
+  - name: omnissa-horizon-client
+    buildsystem: simple
+    sources:
+      - type: file
+        url: https://download3.omnissa.com/software/CART27FQ1_LIN_2603_TARBALL/Omnissa-Horizon-Client-Linux-2603-8.18.0-24120621798.tar.gz
+        sha256: acd30479cec91ee693bbd685880fa3834f3678f8dd336511bb9d732f134f71d7
+        dest-filename: Omnissa-Horizon-Client-Linux.tar.gz
+        x-checker-data:
+          type: json
+          url: "http://localhost:8080/channel/public/api/v1.0/dlg/details?downloadGroup=CART27FQ1_LIN_2603_TARBALL&productId=1616"
+          version-query: .downloadFiles | first | .version
+          url-query: .downloadFiles | first | .thirdPartyDownloadUrl
+    build-commands:
+      # Unpack the main distribution tarball
+      - mkdir -p Outer
+      - tar -xf Omnissa-Horizon-Client-Linux.tar.gz -C Outer --strip-components=1
+      # Extract core client and PCoIP components into /app
+      - tar -xf Outer/x64/Omnissa-Horizon-Client-2603-8.18.0-24120621798.x64.tar.gz
+          -C /app --strip-components=2
+      - tar -xf Outer/x64/Omnissa-Horizon-PCoIP-2603-8.18.0-24120621798.x64.tar.gz
+          -C /app --strip-components=2
+      # Patch hard-coded /usr paths to /app
+      - find /app/bin /app/lib/omnissa -type f -exec grep -lI "/usr/" {} + | xargs -r sed -i 's|/usr/|/app/|g'
+      # Export desktop file and icons
+      - install -Dm644 /app/share/icons/horizon-client.png
+          /app/share/icons/hicolor/64x64/apps/com.omnissa.HorizonClient.png
+      - install -Dm644 /app/share/applications/horizon-client.desktop
+          /app/share/applications/com.omnissa.HorizonClient.desktop
+      # Fix Icon and Exec references in the desktop file
+      - |
+        sed -i \
+          -e 's|Icon=.*|Icon=com.omnissa.HorizonClient|' \
+          -e 's|Exec=horizon-client|Exec=/app/bin/horizon-client|g' \
+          /app/share/applications/com.omnissa.HorizonClient.desktop
+      # Remove the upstream desktop file to avoid duplicate entries
+      - rm -f /app/share/applications/horizon-client.desktop
+          /app/share/applications/horizon-client-next.desktop
