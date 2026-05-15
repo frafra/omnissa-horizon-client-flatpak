@@ -28,6 +28,24 @@ flatpak-builder --force-clean build-dir com.omnissa.HorizonClient.yaml
 flatpak-builder --user --install --force-clean build-dir com.omnissa.HorizonClient.yaml
 ```
 
+## Create a bundle
+
+To create a single-file `.flatpak` bundle that can be shared and installed offline (ensure compliance with the Omnissa EULA/license when sharing):
+
+```bash
+# 1. Build and export to a local repository
+flatpak-builder --repo=repo --force-clean build-dir com.omnissa.HorizonClient.yaml
+
+# 2. Create the .flatpak bundle file
+flatpak build-bundle repo com.omnissa.HorizonClient.flatpak com.omnissa.HorizonClient
+```
+
+To install the bundle:
+
+```bash
+flatpak install com.omnissa.HorizonClient.flatpak
+```
+
 ## Run
 
 ```bash
